@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabella ASCII Interattiva</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #212529;
+        }
+        
+        /* --- STILI TABELLA --- */
+        #asciiTable {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-collapse: collapse;
+            background-color: white;
+        }
+        
+        #asciiTable th, #asciiTable td {
+            border: 1px solid #adb5bd !important;
+            vertical-align: middle;
+            text-align: center;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        #asciiTable thead th {
+            background-color: #e9ecef;
+            color: #000;
+            font-size: 0.95rem;
+        }
+
+        /* Intestazione in alto a sinistra (diagonale) */
+        .diag-cell {
+            background: linear-gradient(to top right, #e9ecef 49%, #adb5bd 50%, #e9ecef 51%);
+            position: relative;
+            min-width: 100px;
+            height: 60px;
+        }
+        .diag-top {
+            position: absolute;
+            top: 2px;
+            right: 5px;
+            font-size: 0.8rem;
+        }
+        .diag-bottom {
+            position: absolute;
+            bottom: 2px;
+            left: 5px;
+            font-size: 0.8rem;
+        }
+
+        /* Celle binarie laterali */
+        .row-bits {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+
+        /* --- EVIDENZIAZIONI GIOCO --- */
+        .highlight-row {
+            background-color: #fff3cd !important; /* Giallo chiaro */
+            transition: background-color 0.3s ease;
+        }
+        .highlight-col {
+            background-color: #cff4fc !important; /* Azzurro chiaro */
+            transition: background-color 0.3s ease;
+        }
+        .highlight-cell {
+            background-color: #198754 !important; /* Verde scuro */
+            color: white !important;
+            font-weight: bold;
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        /* --- AREA GIOCO --- */
+        #gameArea {
+            display: none;
+            border: 2px solid #0d6efd;
+            border-radius: 12px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+        }
+
+        .word-display {
+            font-size: 2.5rem;
+            letter-spacing: 8px;
+            font-weight: 800;
+            font-family: 'Courier New', Courier, monospace;
+            color: #495057;
+        }
+
+        .current-char {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #dc3545;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        
+        .binary-input {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.5rem;
+            letter-spacing: 3px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container my-4">
+    <h1 class="text-center mb-3 fw-bold">Tabella ASCII Interattiva</h1>
+
+    <!-- Pulsanti di selezione modalità (sempre visibili) -->
+    <div class="text-center mb-4">
+        <p class="lead mb-2">Scegli una modalità per iniziare:</p>
+        <div class="btn-group" role="group">
+            <button class="btn btn-outline-primary btn-lg" onclick="startMode('learn')" id="btnLearn">Modalità Impara</button>
+            <button class="btn btn-outline-success btn-lg" onclick="startMode('play')" id="btnPlay">Modalità Gioca</button>
+        </div>
+    </div>
+
+    <!-- Sezione Gioco (nascosta finché non si sceglie una modalità) -->
+    <div id="gameArea" class="mb-5">
+        <div class="row text-center align-items-center">
+            <div class="col-12 mb-4">
+                <h4 class="text-muted">Parola da decodificare:</h4>
+                <div id="currentWordDisplay" class="word-display"></div>
+            </div>
+            
+            <div class="col-md-6 mb-4 mb-md-0">
+                <h5 class="text-muted mb-2">Carattere corrente:</h5>
+                <div id="currentChar" class="current-char"></div>
+            </div>
+
+            <div class="col-md-6">
+                <div id="learnGuide" class="mb-3"></div>
+                
+                <div id="playInputArea" style="display: none;">
+                    <label for="binaryInput" class="form-label fs-6 fw-bold">Inserisci gli 8 bit (0 + colonna + riga):</label>
+                    <div class="input-group input-group-lg justify-content-center">
+                        <input type="text" id="binaryInput" class="form-control binary-input" maxlength="8" placeholder="00000000" autocomplete="off">
+                        <button class="btn btn-success" onclick="checkAnswer()">Verifica</button>
+                    </div>
+                </div>
+                
+                <div id="feedback" class="fs-5 fw-bold mt-3" style="min-height: 30px;"></div>
+            </div>
+
+            <div class="col-12 mt-4">
+                <button class="btn btn-warning btn-lg" onclick="nextCharacter()" id="btnNext" style="display:none;">Prossimo Carattere ➔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabella ASCII -->
+    <div class="table-responsive shadow-sm rounded mb-5">
+        <table id="asciiTable" class="table table-sm w-100 m-0">
+            <thead id="asciiHead">
+                <!-- Popolato via JS -->
+            </thead>
+            <tbody id="asciiBody">
+                <!-- Popolato via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Sezione Storica -->
+    <div class="row align-items-center bg-white p-4 rounded shadow-sm border">
+        <div class="col-md-5 text-center mb-4 mb-md-0">
+            <!-- L'immagine è in locale, non toccare il percorso -->
+            <img src="ASCII.svg" alt="Tabella ASCII Storica" class="img-fluid rounded border shadow-sm">
+        </div>
+        <div class="col-md-7">
+            <h3 class="fw-bold mb-3">Nota Storica: L'ASCII</h3>
+            <p class="fs-6 lh-lg">
+                L'acronimo <strong>ASCII</strong> (<em>American Standard Code for Information Interchange</em>) è stato sviluppato nel 1963 e standardizzato nel 1968. Prima della sua introduzione, ogni produttore di computer utilizzava codifiche diverse, rendendo impossibile la comunicazione tra macchine differenti.
+            </p>
+            <p class="fs-6 lh-lg mb-0">
+                Originariamente basato su <strong>7 bit</strong>, permetteva di rappresentare 128 caratteri (lettere, numeri, punteggiatura e comandi di controllo). Con l'avvento dei sistemi a 8 bit, è stato introdotto un bit di parità iniziale (spesso fisso a 0) o esteso a 256 caratteri (Extended ASCII) per includere simboli grafici e lettere accentate, ponendo le basi per la moderna codifica Unicode.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Sezione Codici di Controllo ASCII -->
+<div class="container my-5">
+    <div class="bg-white p-4 rounded shadow-sm border">
+        <h2 class="fw-bold mb-3 text-center">I Codici di Controllo: istruzioni invisibili</h2>
+        <p class="text-muted text-center mb-4">
+            I primi 32 caratteri della tabella ASCII (da <strong>NUL</strong> a <strong>US</strong>) non sono pensati per essere stampati. Sono <strong>comandi</strong> per le macchine: servivano a controllare telescriventi, nastri di carta perforata e modem. Molti sono caduti in disuso, altri sono diventati fondamentali nell'informatica moderna.
+        </p>
+
+        <div class="accordion" id="controlliAccordion">
+
+            <!-- NUL -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#nul">
+                        NUL (Null) — Il carattere "nulla"
+                    </button>
+                </h3>
+                <div id="nul" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p><strong>Scopo originale:</strong> Non fare assolutamente nulla. Veniva usato come riempitivo (padding) sui nastri di carta perforata: quando un messaggio era più corto del blocco previsto, si riempiva il resto con NUL per rallentare intenzionalmente la trasmissione o per occupare spazio vuoto. Il nastro vergine, non perforato, veniva letto come una sequenza di NUL.</p>
+                        <p><strong>Eredità moderna:</strong> È il carattere di terminazione delle stringhe nel linguaggio C (e in molti suoi derivati). Quando un programma C legge una stringa, si ferma al primo byte `0x00`. Questo uso è così radicato che ancora oggi, in molti contesti, "carattere nullo" significa "fine della stringa".</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SOH, STX, ETX, EOT -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#strutturaMessaggio">
+                        SOH, STX, ETX, EOT — L'impalcatura di un messaggio
+                    </button>
+                </h3>
+                <div id="strutturaMessaggio" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p>Questi quattro codici definivano la struttura di un messaggio nelle prime reti di telescriventi. Immagina un sistema dove più terminali condividono la stessa linea: il messaggio doveva avere un mittente, un contenuto e una fine chiara.</p>
+                        <ul>
+                            <li><strong>SOH (Start of Heading, `^A`):</strong> Inizio dell'intestazione. Segnalava l'inizio del blocco di indirizzo del destinatario. Le prime documentazioni lo chiamavano "Start of Message".</li>
+                            <li><strong>STX (Start of Text, `^B`):</strong> Inizio del testo. Terminava l'intestazione e dava inizio al corpo del messaggio vero e proprio.</li>
+                            <li><strong>ETX (End of Text, `^C`):</strong> Fine del testo. Indicava la fine del corpo del messaggio e l'inizio dell'eventuale piè di pagina. Oggi `Ctrl+C` è universalmente noto come "interrompi processo".</li>
+                            <li><strong>EOT (End of Transmission, `^D`):</strong> Fine della trasmissione. Chiudeva l'intera sessione di comunicazione. Nei sistemi Unix, `Ctrl+D` segnala la fine dell'input (EOF) e in passato serviva anche a disconnettersi da un terminale.</li>
+                        </ul>
+                        <p><strong>Curiosità:</strong> Il protocollo di trasferimento file XMODEM usava estensivamente SOH, STX ed ETX per incapsulare i blocchi di dati.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ENQ, ACK, NAK -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#dialogo">
+                        ENQ, ACK, NAK — Il dialogo tra macchine
+                    </button>
+                </h3>
+                <div id="dialogo" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p>Prima di inviare dati, le macchine dovevano assicurarsi che l'altro capo fosse pronto e funzionante. Questi tre codici gestivano la conversazione.</p>
+                        <ul>
+                            <li><strong>ENQ (Enquiry, `^E`):</strong> "Ci sei?". Inviava un segnale di interrogazione. Nelle telescriventi, attivava un meccanismo di risposta automatica che restituiva un codice identificativo del terminale (una sorta di "Chi sei?" o WRU, *Who Are You*).</li>
+                            <li><strong>ACK (Acknowledge, `^F`):</strong> "Ricevuto!". Confermava la ricezione corretta di un messaggio o di un blocco di dati.</li>
+                            <li><strong>NAK (Negative Acknowledge, `^U`):</strong> "Errore!". Segnalava che qualcosa era andato storto nella trasmissione, chiedendo implicitamente la ritrasmissione del blocco.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BEL, BS, HT, LF, VT, FF, CR -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#movimento">
+                        BEL, BS, HT, LF, VT, FF, CR — Il controllo del cursore e della carta
+                    </button>
+                </h3>
+                <div id="movimento" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p>Questi codici, chiamati "effettori di formato", comandavano i movimenti meccanici delle stampanti e dei terminali a carta.</p>
+                        <ul>
+                            <li><strong>BEL (Bell, `^G`):</strong> Faceva suonare un campanello o un cicalino per richiamare l'attenzione dell'operatore. Sui primi terminali era un vero martelletto meccanico. Ancora oggi, inviare `\a` in un terminale moderno produce un "beep".</li>
+                            <li><strong>BS (Backspace, `^H`):</strong> Spostava il carrello di una posizione indietro, permettendo di sovrascrivere il carattere precedente.</li>
+                            <li><strong>HT (Horizontal Tabulation, `^I`):</strong> Spostava il carrello alla successiva tabulazione orizzontale predefinita. È l'antenato del tasto Tab della tastiera.</li>
+                            <li><strong>LF (Line Feed, `^J`):</strong> Avanzava la carta di una riga, mantenendo la stessa colonna. Da solo non riportava il carrello all'inizio.</li>
+                            <li><strong>VT (Vertical Tabulation, `^K`):</strong> Spostava la carta alla successiva tabulazione verticale. Oggi è quasi del tutto inutilizzato.</li>
+                            <li><strong>FF (Form Feed, `^L`):</strong> Avanzava la carta fino all'inizio della pagina successiva (o espelleva il foglio). Ancora oggi è usato in alcuni linguaggi per separare le "pagine" logiche di un file di testo.</li>
+                            <li><strong>CR (Carriage Return, `^M`):</strong> Riportava il carrello (o il cursore) alla colonna zero, senza cambiare riga. Nei sistemi Windows, la combinazione CR+LF (`\r\n`) segnala la fine di una riga; nei sistemi Unix si usa solo LF (`\n`).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SO, SI -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#setCaratteri">
+                        SO, SI — Il cambio di alfabeto
+                    </button>
+                </h3>
+                <div id="setCaratteri" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p><strong>SO (Shift Out, `^N`)</strong> e <strong>SI (Shift In, `^O`)</strong> permettevano di commutare tra due set di caratteri alternativi su una stessa macchina. Immagina una telescrivente che, oltre all'alfabeto latino standard, avesse bisogno di stampare simboli matematici o lettere di un altro alfabeto: SO attivava il set alternativo, SI ripristinava quello normale.</p>
+                        <p><strong>Curiosità:</strong> In tempi più recenti, alcuni sistemi operativi (come DEC) usarono `Ctrl+O` (SI) come comando per sospendere temporaneamente l'output su terminale, un uso del tutto scollegato dallo scopo originale.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DLE, DC1-DC4 -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#dispositivi">
+                        DLE, DC1, DC2, DC3, DC4 — Il controllo dei dispositivi
+                    </button>
+                </h3>
+                <div id="dispositivi" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p>Questi codici servivano a comandare periferiche fisiche come lettori e perforatori di nastro di carta.</p>
+                        <ul>
+                            <li><strong>DLE (Data Link Escape, `^P`):</strong> Un "escape" limitato: cambiava il significato dei caratteri immediatamente successivi, ma solo per una breve sequenza. Era pensato per introdurre comandi speciali all'interno di un flusso di dati.</li>
+                            <li><strong>DC1 (Device Control 1, `^Q`) / XON:</strong> Accendeva un dispositivo. Sulle telescriventi, azionava il lettore di nastro di carta. Questo uso divenne lo standard *de facto* per il controllo di flusso software: XON dice "riprendi a trasmettere".</li>
+                            <li><strong>DC2 (Device Control 2, `^R`):</strong> Accendeva un secondo dispositivo (spesso il perforatore di nastro).</li>
+                            <li><strong>DC3 (Device Control 3, `^S`) / XOFF:</strong> Spegneva un dispositivo. Divenne il segnale di *flow control* opposto a XON: "ferma la trasmissione". Ancora oggi, in un terminale, `Ctrl+S` può congelare l'output e `Ctrl+Q` lo riprende.</li>
+                            <li><strong>DC4 (Device Control 4, `^T`):</strong> Spegneva un altro dispositivo (spesso il perforatore).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SYN, ETB -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#sincronia">
+                        SYN, ETB — Sincronia e blocchi
+                    </button>
+                </h3>
+                <div id="sincronia" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <ul>
+                            <li><strong>SYN (Synchronous Idle, `^V`):</strong> Inviato quando non c'erano dati da trasmettere, serviva a mantenere la sincronizzazione tra trasmettitore e ricevitore in sistemi di comunicazione sincroni.</li>
+                            <li><strong>ETB (End of Transmission Block, `^W`):</strong> Indicava la fine di un blocco di dati quando il messaggio era troppo lungo per essere inviato in una volta sola e veniva suddiviso in blocchi.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CAN, EM, SUB, ESC -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#errori">
+                        CAN, EM, SUB, ESC — Annullare, sostituire, uscire
+                    </button>
+                </h3>
+                <div id="errori" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <ul>
+                            <li><strong>CAN (Cancel, `^X`):</strong> Indicava che i dati precedenti erano errati o dovevano essere ignorati. Un "annulla" a livello di trasmissione.</li>
+                            <li><strong>EM (End of Medium, `^Y`):</strong> Segnalava che su un nastro (di carta o magnetico) si era raggiunta la fine della porzione utilizzabile.</li>
+                            <li><strong>SUB (Substitute, `^Z`):</strong> Sostituiva un carattere che era stato riconosciuto come invalido o corrotto. Nei sistemi CP/M e MS-DOS, `Ctrl+Z` (SUB) fu adottato come marcatore di fine file (EOF) per i file di testo.</li>
+                            <li><strong>ESC (Escape, `^[`):</strong> Il più importante dei codici di controllo moderni. "Esegue l'escape" dalle normali funzioni della telescrivente e introduce una sequenza di comandi speciali. Oggi è quasi esclusivamente usato per introdurre le **sequenze di escape ANSI**, che controllano colore, posizione del cursore e altre funzionalità dei terminali moderni.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FS, GS, RS, US -->
+            <div class="accordion-item">
+                <h3 class="accordion-header">
+                    <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#separatori">
+                        FS, GS, RS, US — I separatori gerarchici
+                    </button>
+                </h3>
+                <div id="separatori" class="accordion-collapse collapse" data-bs-parent="#controlliAccordion">
+                    <div class="accordion-body">
+                        <p>Questi quattro codici (detti anche "separatori di informazione", IS) erano pensati per organizzare dati strutturati in modo gerarchico, molto prima dei database e dei formati come XML o JSON.</p>
+                        <ul>
+                            <li><strong>US (Unit Separator, `^_`):</strong> Il livello più basso. Separava singole unità di dati (ad esempio, i campi di un record).</li>
+                            <li><strong>RS (Record Separator, `^^`):</strong> Separava i record (le righe di una tabella).</li>
+                            <li><strong>GS (Group Separator, `^]`):</strong> Separava gruppi di record.</li>
+                            <li><strong>FS (File Separator, `^\`):</strong> Il livello più alto. Separava interi file o sezioni logiche di dati.</li>
+                        </ul>
+                        <p><strong>Uso moderno:</strong> Benché raramente implementati nelle telescriventi dell'epoca, alcuni formati moderni li usano ancora. Ad esempio, il comando `splitlines()` di Python e il formato di documentazione Unix `info` li impiegano come separatori logici.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="mt-4 p-3 bg-light rounded border">
+            <h4 class="fw-bold">Perché sono ancora sulla tastiera?</h4>
+            <p class="mb-0">
+                Anche se la maggior parte di questi comandi non ha più un ruolo nel controllo fisico delle macchine, le combinazioni <kbd>Ctrl</kbd> + lettera sono rimaste. La logica è che, nelle telescriventi, il tasto <kbd>Ctrl</kbd> "spostava" il codice della lettera nell'intervallo dei caratteri di controllo (ad esempio, la "G" è il codice 71, `Ctrl+G` diventa 7, cioè BEL). Questa mappatura è sopravvissuta fino ai moderni terminali e sistemi operativi.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+</div>
+
+<!-- jQuery & DataTables -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- Bootstrap JS (necessario per far funzionare gli accordion) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
+<script>
+    // Struttura dati della tabella ASCII (16 righe x 8 colonne)
+    const tableData = [
+        ["NUL", "DLE", "SP", "0", "@", "P", "`", "p"],
+        ["SOH", "DC1", "!", "1", "A", "Q", "a", "q"],
+        ["STX", "DC2", "\"", "2", "B", "R", "b", "r"],
+        ["ETX", "DC3", "#", "3", "C", "S", "c", "s"],
+        ["EOT", "DC4", "$", "4", "D", "T", "d", "t"],
+        ["ENQ", "NAK", "%", "5", "E", "U", "e", "u"],
+        ["ACK", "SYN", "&", "6", "F", "V", "f", "v"],
+        ["BEL", "ETB", "'", "7", "G", "W", "g", "w"],
+        ["BS", "CAN", "(", "8", "H", "X", "h", "x"],
+        ["HT", "EM", ")", "9", "I", "Y", "i", "y"],
+        ["LF", "SUB", "*", ":", "J", "Z", "j", "z"],
+        ["VT", "ESC", "+", ";", "K", "[", "k", "{"],
+        ["FF", "FS", ",", "<", "L", "\\", "l", "|"],
+        ["CR", "GS", "-", "=", "M", "]", "m", "}"],
+        ["SO", "RS", ".", ">", "N", "^", "n", "~"],
+        ["SI", "US", "/", "?", "O", "_", "o", "DEL"]
+    ];
+
+    let words = [];
+    let currentWord = "";
+    let currentCharIndex = 0;
+    let currentMode = "";
+    let targetRow = -1;
+    let targetCol = -1;
+
+    // Inizializzazione Tabella
+    function initTable() {
+        const thead = document.getElementById('asciiHead');
+        const tbody = document.getElementById('asciiBody');
+
+        // Genera Header (1 riga)
+        let trHead = document.createElement('tr');
+        
+        // Cella diagonale
+        let diagTh = document.createElement('th');
+        diagTh.className = 'diag-cell';
+        diagTh.innerHTML = `
+            <div class="diag-top">b7 b6 b5</div>
+            <div class="diag-bottom">b4 b3 b2 b1</div>
+        `;
+        trHead.appendChild(diagTh);
+
+        // Colonne 0-7 (b7 b6 b5)
+        for (let c = 0; c <= 7; c++) {
+            let th = document.createElement('th');
+            th.innerHTML = `<span class="text-primary">${c.toString(2).padStart(3, '0')}</span>`;
+            trHead.appendChild(th);
+        }
+        thead.appendChild(trHead);
+
+        // Genera Body
+        for (let r = 0; r <= 15; r++) {
+            let tr = document.createElement('tr');
+            
+            // Bit di riga (b4 b3 b2 b1)
+            let tdBits = document.createElement('td');
+            tdBits.innerHTML = `<span class="text-success">${r.toString(2).padStart(4, '0')}</span>`;
+            tdBits.className = 'row-bits';
+            tr.appendChild(tdBits);
+
+            // Caratteri
+            for (let c = 0; c <= 7; c++) {
+                let td = document.createElement('td');
+                td.textContent = tableData[r][c];
+                td.dataset.row = r;
+                td.dataset.col = c;
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        // Inizializza DataTables (senza errori di colonne)
+        $('#asciiTable').DataTable({
+            paging: false,
+            searching: false,
+            info: false,
+            ordering: false,
+            responsive: true,
+            autoWidth: false
+        });
+    }
+
+    // Carica parole dal link
+    async function loadWords() {
+        try {
+            const response = await fetch('https://gist.githubusercontent.com/salvatorecapolupo/846387b70ee3ddb2a658c97e17baf60b/raw/38bab98391e53fddc0ededbcb9a92c275edab73d/parolecampione.txt');
+            const text = await response.text();
+            words = text.split('\n').map(w => w.trim().toUpperCase()).filter(w => w.length > 0);
+        } catch (error) {
+            console.error("Errore caricamento parole:", error);
+            words = ["CIAO", "SCUOLA", "BIT", "CODICE", "ITALIA"]; // Fallback
+        }
+    }
+
+    // Avvia Modalità
+    function startMode(mode) {
+        if (words.length === 0) {
+            alert("Caricamento parole in corso, attendere un secondo...");
+            return;
+        }
+        
+        currentMode = mode;
+        currentWord = words[Math.floor(Math.random() * words.length)];
+        currentCharIndex = 0;
+        
+        // Mostra l'area di gioco
+        document.getElementById('gameArea').style.display = 'block';
+        document.getElementById('btnNext').style.display = 'inline-block';
+        document.getElementById('playInputArea').style.display = mode === 'play' ? 'block' : 'none';
+        document.getElementById('learnGuide').style.display = mode === 'learn' ? 'block' : 'none';
+        
+        // Aggiorna lo stato attivo dei pulsanti esterni
+        document.getElementById('btnLearn').classList.toggle('active', mode === 'learn');
+        document.getElementById('btnPlay').classList.toggle('active', mode === 'play');
+        
+        loadCharacter();
+    }
+
+    // Carica carattere corrente
+    function loadCharacter() {
+        if (currentCharIndex >= currentWord.length) {
+            document.getElementById('currentWordDisplay').textContent = currentWord;
+            document.getElementById('currentChar').textContent = "✓";
+            document.getElementById('feedback').textContent = "🎉 Parola completata!";
+            document.getElementById('feedback').className = "fs-5 fw-bold text-success mt-3";
+            document.getElementById('playInputArea').style.display = 'none';
+            document.getElementById('learnGuide').style.display = 'none';
+            document.getElementById('btnNext').style.display = 'none';
+            return;
+        }
+
+        const char = currentWord[currentCharIndex];
+        document.getElementById('currentWordDisplay').textContent = currentWord;
+        document.getElementById('currentChar').textContent = char;
+        document.getElementById('feedback').textContent = "";
+        document.getElementById('binaryInput').value = "";
+        
+        // Rimuovi evidenziazioni precedenti
+        document.querySelectorAll('.highlight-row, .highlight-col, .highlight-cell').forEach(el => {
+            el.classList.remove('highlight-row', 'highlight-col', 'highlight-cell');
+        });
+
+        // Trova coordinate carattere
+        targetRow = -1; targetCol = -1;
+        for (let r = 0; r < 16; r++) {
+            for (let c = 0; c < 8; c++) {
+                if (tableData[r][c] === char) {
+                    targetRow = r; targetCol = c; break;
+                }
+            }
+            if (targetRow !== -1) break;
+        }
+
+        if (targetRow !== -1) {
+            const rowBits = targetRow.toString(2).padStart(4, '0');
+            const colBits = targetCol.toString(2).padStart(3, '0');
+            
+            if (currentMode === 'learn') {
+                // Evidenzia riga e colonna (col + 2 perché c'è la colonna dei bit)
+                $(`#asciiTable tbody tr:nth-child(${targetRow + 1})`).addClass('highlight-row');
+                $(`#asciiTable tbody tr td:nth-child(${targetCol + 2})`).addClass('highlight-col');
+                $(`#asciiTable tbody tr:nth-child(${targetRow + 1}) td:nth-child(${targetCol + 2})`).addClass('highlight-cell');
+
+                document.getElementById('learnGuide').innerHTML = `
+                    <div class="alert alert-info py-2 mb-0">
+                        <strong>Guida:</strong><br>
+                        Colonna (b7 b6 b5): <span class="text-primary font-monospace fs-5">${colBits}</span><br>
+                        Riga (b4 b3 b2 b1): <span class="text-success font-monospace fs-5">${rowBits}</span><br>
+                        <small>Bit iniziale (parità): <strong>0</strong></small>
+                    </div>
+                `;
+            } else {
+                // Modalità play: focus sull'input
+                document.getElementById('binaryInput').focus();
+            }
+        }
+    }
+
+    // Verifica risposta
+    function checkAnswer() {
+        if (targetRow === -1) return;
+        
+        const input = document.getElementById('binaryInput').value.trim();
+        // L'ASCII a 8 bit prevede un bit iniziale 0 (parità)
+        const correctBinary = "0" + targetCol.toString(2).padStart(3, '0') + targetRow.toString(2).padStart(4, '0');
+        
+        if (input === correctBinary) {
+            document.getElementById('feedback').textContent = "✅ Corretto!";
+            document.getElementById('feedback').className = "fs-5 fw-bold text-success mt-3";
+            setTimeout(nextCharacter, 1200);
+        } else {
+            document.getElementById('feedback').textContent = "❌ Errato. Riprova!";
+            document.getElementById('feedback').className = "fs-5 fw-bold text-danger mt-3";
+            document.getElementById('binaryInput').select();
+        }
+    }
+
+    // Prossimo carattere
+    function nextCharacter() {
+        document.getElementById('feedback').className = "fs-5 fw-bold mt-3";
+        currentCharIndex++;
+        loadCharacter();
+    }
+
+    // Permetti invio con il tasto Enter
+    document.getElementById('binaryInput')?.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') checkAnswer();
+    });
+
+    // Avvio
+    window.onload = () => {
+        initTable();
+        loadWords();
+    };
+</script>
+</body>
+</html>
